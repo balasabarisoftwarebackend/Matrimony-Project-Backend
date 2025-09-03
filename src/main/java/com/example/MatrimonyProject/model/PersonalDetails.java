@@ -40,7 +40,7 @@ public class PersonalDetails {
 
 
     // ✅ Known languages (many-to-many)
-    @ManyToMany(fetch = FetchType.LAZY , cascade = {CascadeType.PERSIST , CascadeType.MERGE})
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
             name = "personal_languages",
             joinColumns = @JoinColumn(name = "personal_id"),
@@ -49,7 +49,7 @@ public class PersonalDetails {
     private List<Language> languagesKnown = new ArrayList<>();
 
     // ✅ Mother tongue (one-to-one with Language)
-    @ManyToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST , CascadeType.MERGE})
+    @ManyToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinColumn(name = "mother_tongue_id")
     private Language motherTongue;
 

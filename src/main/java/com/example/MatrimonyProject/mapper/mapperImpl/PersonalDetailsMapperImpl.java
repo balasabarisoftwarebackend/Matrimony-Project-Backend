@@ -7,6 +7,10 @@ import com.example.MatrimonyProject.model.secondary.Language;
 import com.example.MatrimonyProject.repo.secondaryRepo.LanguageRepo;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 @Component
 
 public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
@@ -32,9 +36,11 @@ public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
                 .familyType(entity.getFamilyType())
                 .motherTongue(entity.getMotherTongue() != null ? entity.getMotherTongue().getName() : null)
                 .languagesKnown(
-                        entity.getLanguagesKnown().stream()
+                        entity.getLanguagesKnown() != null
+                                ? entity.getLanguagesKnown().stream()
                                 .map(Language::getName)
                                 .toList()
+                                : List.of()
                 )
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -44,7 +50,8 @@ public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
     @Override
     public PersonalDetails toEntity(PersonalDetailsDTO dto) {
         if (dto == null) return null;
-        PersonalDetails entity = PersonalDetails.builder()
+
+        return PersonalDetails.builder()
                 .id(dto.getId())
                 .maritalStatus(dto.getMaritalStatus())
                 .nationality(dto.getNationality())
@@ -53,28 +60,9 @@ public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
                 .height(dto.getHeight())
                 .familyStatus(dto.getFamilyStatus())
                 .familyType(dto.getFamilyType())
+                //.languagesKnown(Collections.emptyList()) // Initialize empty
+                .languagesKnown(new ArrayList<>()) // ✅ never null
                 .build();
-
-
-        // Map mother tongue (lookup by name)
-        if (dto.getMotherTongue() != null) {
-            entity.setMotherTongue(
-                    languageRepo.findByNameIgnoreCase(dto.getMotherTongue())
-                            .orElseThrow(() -> new RuntimeException("Invalid language: " + dto.getMotherTongue()))
-            );
-        }
-
-        // Map languages known (lookup list by names)
-        if (dto.getLanguagesKnown() != null && !dto.getLanguagesKnown().isEmpty()) {
-            entity.setLanguagesKnown(
-                    dto.getLanguagesKnown().stream()
-                            .map(name -> languageRepo.findByNameIgnoreCase(name)
-                                    .orElseThrow(() -> new RuntimeException("Invalid language: " + name)))
-                            .toList()
-            );
-        }
-
-        return entity;
     }
 
 

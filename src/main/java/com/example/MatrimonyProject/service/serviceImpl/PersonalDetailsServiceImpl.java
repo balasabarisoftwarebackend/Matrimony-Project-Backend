@@ -14,7 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,45 +28,53 @@ public class PersonalDetailsServiceImpl implements PersonalDetailsService {
    private final UserProfileRepo  userProfileRepo;
     private final LanguageRepo languageRepo;
 
+    // 🔹 Helper to resolve language safely
+    private Language resolveLanguage(String name) {
+        return languageRepo.findByNameIgnoreCase(name.trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Invalid language: " + name));
+    }
+
     @Override
+    @Transactional
     public PersonalDetailsDTO create(Long userId, PersonalDetailsDTO dto) {
         UserProfile user = userProfileRepo.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("UserProfile not found with id " + userId));
 
-        // Basic mapping
+        // Map basic fields
         PersonalDetails entity = personalDetailsMapper.toEntity(dto);
         entity.setUser(user);
 
         // Save first
         PersonalDetails saved = personalDetailsRepo.save(entity);
 
-        // Mother tongue
-        if (dto.getMotherTongue() != null) {
-            Language motherTongue = languageRepo.findByNameIgnoreCase(dto.getMotherTongue())
-                    .orElseThrow(() -> new ResourceNotFoundException("Invalid mother tongue: " + dto.getMotherTongue()));
+        // Set mother tongue
+        if (dto.getMotherTongue() != null && !dto.getMotherTongue().isBlank()) {
+            Language motherTongue = resolveLanguage(dto.getMotherTongue());
             saved.setMotherTongue(motherTongue);
         }
 
-        // Known languages
+        // Set languagesKnown
         if (dto.getLanguagesKnown() != null && !dto.getLanguagesKnown().isEmpty()) {
-            List<Language> languages = dto.getLanguagesKnown().stream()
-                    .map(name -> languageRepo.findByNameIgnoreCase(name)
-                            .orElseThrow(() -> new ResourceNotFoundException("Invalid language: " + name)))
-                    .toList();
-            saved.setLanguagesKnown(languages);
+            List<Language> langs = dto.getLanguagesKnown()
+                    .stream()
+                    .map(this::resolveLanguage)
+                    .collect(Collectors.toList());
+            saved.setLanguagesKnown(langs);
         }
 
-        // Save relationships
+        // Save again
         saved = personalDetailsRepo.save(saved);
 
-        // Update user
+        // Link to user
         user.setPersonalDetails(saved);
         userProfileRepo.save(user);
 
-        return personalDetailsMapper.toDto(saved);
+        // Reload with relationships
+        PersonalDetails reloaded = personalDetailsRepo.findById(saved.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Failed to reload personal details"));
+
+        return personalDetailsMapper.toDto(reloaded);
     }
-
-
 
 
     @Override
@@ -74,6 +82,7 @@ public class PersonalDetailsServiceImpl implements PersonalDetailsService {
         PersonalDetails existing = personalDetailsRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PersonalDetails not found with id " + id));
 
+        // 🔹 Update basic fields
         existing.setMaritalStatus(dto.getMaritalStatus());
         existing.setNationality(dto.getNationality());
         existing.setNumberOfChildren(dto.getNumberOfChildren());
@@ -82,28 +91,28 @@ public class PersonalDetailsServiceImpl implements PersonalDetailsService {
         existing.setFamilyStatus(dto.getFamilyStatus());
         existing.setFamilyType(dto.getFamilyType());
 
-        // Mother tongue
-        if (dto.getMotherTongue() != null) {
-            Language motherTongue = languageRepo.findByNameIgnoreCase(dto.getMotherTongue())
-                    .orElseThrow(() -> new ResourceNotFoundException("Invalid mother tongue: " + dto.getMotherTongue()));
-            existing.setMotherTongue(motherTongue);
+        // 🔹 Update mother tongue
+        if (dto.getMotherTongue() != null && !dto.getMotherTongue().isBlank()) {
+            existing.setMotherTongue(resolveLanguage(dto.getMotherTongue()));
         } else {
             existing.setMotherTongue(null);
         }
 
-        // Languages
-        if (dto.getLanguagesKnown() != null) {
-            List<Language> languages = dto.getLanguagesKnown().stream()
-                    .map(name -> languageRepo.findByNameIgnoreCase(name)
-                            .orElseThrow(() -> new ResourceNotFoundException("Invalid language: " + name)))
-                    .toList();
+        // 🔹 Update languages
+        if (dto.getLanguagesKnown() != null && !dto.getLanguagesKnown().isEmpty()) {
+            List<Language> languages = dto.getLanguagesKnown()
+                    .stream()
+                    .map(this::resolveLanguage)
+                    .collect(Collectors.toList());
             existing.setLanguagesKnown(languages);
         } else {
-            existing.setLanguagesKnown(new ArrayList<>()); // ✅ safe reset
+            existing.getLanguagesKnown().clear();
         }
 
-        return personalDetailsMapper.toDto(personalDetailsRepo.save(existing));
+        PersonalDetails updated = personalDetailsRepo.save(existing);
+        return personalDetailsMapper.toDto(updated);
     }
+
 
 
     @Override

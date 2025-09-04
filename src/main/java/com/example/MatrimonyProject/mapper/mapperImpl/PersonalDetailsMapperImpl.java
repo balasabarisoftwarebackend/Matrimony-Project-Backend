@@ -8,14 +8,12 @@ import com.example.MatrimonyProject.repo.secondaryRepo.LanguageRepo;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Component
-
 public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
 
-    private final LanguageRepo  languageRepo;
+    private final LanguageRepo languageRepo;
 
     public PersonalDetailsMapperImpl(LanguageRepo languageRepo) {
         this.languageRepo = languageRepo;
@@ -51,7 +49,7 @@ public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
     public PersonalDetails toEntity(PersonalDetailsDTO dto) {
         if (dto == null) return null;
 
-        return PersonalDetails.builder()
+        PersonalDetails entity = PersonalDetails.builder()
                 .id(dto.getId())
                 .maritalStatus(dto.getMaritalStatus())
                 .nationality(dto.getNationality())
@@ -60,10 +58,27 @@ public class PersonalDetailsMapperImpl implements PersonalDetailsMapper {
                 .height(dto.getHeight())
                 .familyStatus(dto.getFamilyStatus())
                 .familyType(dto.getFamilyType())
-                //.languagesKnown(Collections.emptyList()) // Initialize empty
-                .languagesKnown(new ArrayList<>()) // ✅ never null
+                .languagesKnown(new ArrayList<>()) // start empty, fill below
                 .build();
+
+        // ✅ Resolve mother tongue (if provided)
+        if (dto.getMotherTongue() != null && !dto.getMotherTongue().isBlank()) {
+            entity.setMotherTongue(
+                    languageRepo.findByNameIgnoreCase(dto.getMotherTongue())
+                            .orElseThrow(() -> new RuntimeException("Invalid mother tongue: " + dto.getMotherTongue()))
+            );
+        }
+
+        // ✅ Resolve languagesKnown (if provided)
+        if (dto.getLanguagesKnown() != null && !dto.getLanguagesKnown().isEmpty()) {
+            List<Language> langs = dto.getLanguagesKnown().stream()
+                    .map(name -> languageRepo.findByNameIgnoreCase(name)
+                            .orElseThrow(() -> new RuntimeException("Invalid language: " + name)))
+                    .toList();
+            entity.setLanguagesKnown(langs);
+        }
+
+        return entity;
+
     }
-
-
 }
